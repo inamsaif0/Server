@@ -350,7 +350,7 @@ app.post('/login', async (req, res) => {
   // Serve the uploaded files
   app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 //
-app.listen(3000,()=>{
+app.listen(3001,()=>{
     console.log("started")
     // console.log("connected to DB")
 })
