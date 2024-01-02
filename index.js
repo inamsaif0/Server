@@ -7,11 +7,11 @@ const multer = require('multer');
 const path = require('path');
 const filesupload = require('./Models/fileupload');
 const fileupload = require("./Models/fileupload");
-const { findDocuments,findNameByEmail } = require('./mongoGetDocs');
+const { findDocuments,findNameByEmail, findAllTeachers, connectToDatabase } = require('./mongoGetDocs');
 // const SP = require('./Models/ServiceProvider.model')
 // const References = require('./Models/References')
 // const CompletedTransaction = require("./Models/CompletedTransactions");
-
+const { MongoClient } = require('mongodb')
 
 const s3 = new AWS.S3({
   accessKeyId: "AKIA5FUXJXFEIHM7O4FR",
@@ -32,13 +32,50 @@ app.use(express.urlencoded({limit: '25mb', extended: true}));
 
 
 
-mongoose.connect("mongodb+srv://otp:inam1234@cluster0.jnbirzy.mongodb.net/?retryWrites=true&w=majority",{
-    useNewUrlParser:true,
-    useUnifiedTopology:true,
-    useNewUrlParser:true
-});()=>{
-    console.log("connected to DB") // should update
-}
+// mongoose.connect("mongodb+srv://otp:inam1234<password>@cluster0.jnbirzy.mongodb.net/?retryWrites=true&w=majority", {
+//   useNewUrlParser: true,
+//   useUnifiedTopology: true,
+// }, (err) => {
+//   if (err) {
+//     console.error("Error connecting to DB:", err);
+//   } else {
+//     console.log("Connected to DB");
+//   }
+// });
+
+const uri = 'mongodb+srv://otp:inam1234@cluster0.jnbirzy.mongodb.net/?retryWrites=true&w=majority'; // Replace with your MongoDB connection URI
+const dbName = 'test'; // Replace with your database name
+
+// // Create a MongoDB connection pool
+const options = {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  maxPoolSize: 10, // Adjust the maximum pool size as per your requirements
+};
+mongoose.connect(
+  uri,
+  options
+)
+.then(()=>console.log('connected'))
+.catch(e=>console.log(e));
+
+// const client = new MongoClient(uri, options);
+// let db; // Declare a global variable to store the database instance
+
+// // Function to connect to the MongoDB database
+// const connectToDatabase = async () => {
+//   try {
+//     if (!db) {
+//       await client.connect();
+//       db = client.db(dbName);
+//       console.log('Connected to the database');
+//     }
+//     return db;
+//   } catch (error) {
+//     console.error('Error connecting to the database:', error);
+//   }
+// };
+
 
 // const storage = multer.diskStorage({
 //   destination: function (req, file, cb) {
@@ -54,13 +91,18 @@ mongoose.connect("mongodb+srv://otp:inam1234@cluster0.jnbirzy.mongodb.net/?retry
   
 
 app.get('/documents',async(req,res)=>{
+  const con = await connectToDatabase();
+
   const {email}=req.query;
   studentName=await findNameByEmail(email) 
   result=await findDocuments(studentName);
   res.json(result)
+})
 
-
-
+app.get('/getTeachers', async(req, res) => {
+  let data = await findAllTeachers();
+  // return data;
+  res.status(200).json({data})
 })
 
 app.get('/audio', async (req, res) => {
@@ -91,37 +133,84 @@ app.get('/audio', async (req, res) => {
 
 const upload = multer({ limits: { fileSize: 50 * 1024 * 1024 } }); // Set the maximum file size limit to 10MB
 
-app.post('/audio', upload.single('audio'),(req, res) => {
-  const { audio, time,email,name } = req.body;
+
+const AudioFiles = require('./Models/audioFiles')
+const Teacher = require('./Models/teachers')
+
+app.post('/audio', upload.single('audio'), async (req, res) => {
+  const { audio, time, email, name, teacherData } = req.body;
+  let obj = {};
+  let link;
 
   const base64Data = audio.replace(/^data:audio\/(.*);base64,/, '');
   let fileName = `audio_${time}.m4a`; // Generate a unique file name
-  const alternateName=`${name}.m4a`;
+  const alternateName = `${name}.m4a`;
   const bucketName = 'otp-mobile'; // Replace with your S3 bucket name
 
-  if(name)
-  {
-    fileName=alternateName
+  if (name) {
+    fileName = alternateName;
   }
 
   const params = {
     Bucket: bucketName,
-    Key: 'otp-audio/'+email+'/'+fileName,
+    Key: 'otp-audio/' + email + '/' + fileName,
     Body: Buffer.from(base64Data, 'base64'),
-    ContentType: 'audio/m4a'
+    ContentType: 'audio/m4a',
   };
 
-  s3.upload(params, (err, data) => {
+  s3.upload(params, async (err, data) => {
     if (err) {
       console.error('Error uploading audio file:', err);
       res.status(500).json({ error: 'Failed to upload audio file' });
     } else {
+      obj.audioLink = data.Location; // Assign S3 location to obj.audioLink
+      obj.teacherEmail = teacherData.email;
+      obj.time = time;
+      obj.ownerEmail = email;
+      obj.status = null
       console.log('Audio file uploaded successfully:', data.Location);
-      res.json({ success: true });
+
+      try {
+        // Create a new instance of the audioFiles document
+        const newAudioFile = new AudioFiles(obj);
+        console.log(obj)
+        // Save the document to the database
+        const savedAudioFile = await newAudioFile.save();
+
+        res.json(savedAudioFile);
+      } catch (error) {
+        console.error('Error adding audio file:', error);
+        res.status(500).send('Internal Server Error');
+      }
     }
   });
 });
+app.post('/delete-audio', async (req, res) => {
+  const { filename, email } = req.body; // Assuming the filename is provided in the request body
+  const bucketName = 'otp-mobile'; // Replace with your S3 bucket name
+  // const key = 'otp-audio/' + filename;
+  const params = {
+    Bucket: bucketName,
+    Key: 'otp-audio/' + email + '/' + filename,
+    // ContentType: 'audio/m4a',
 
+  };
+  console.log('data',filename, email)
+
+  try {
+    // Delete the object from the S3 bucket
+    console.log('data', params)
+    await s3.deleteObject(params).promise();
+    console.log(`Recording ${filename} deleted successfully from S3`);
+
+    // You can also delete the corresponding entry from your database if needed
+
+    res.status(200).json({ message: `Recording ${filename} deleted successfully` });
+  } catch (error) {
+    console.error(`Error deleting recording ${filename} from S3:`, error);
+    res.status(500).json({ error: 'Failed to delete recording from S3' });
+  }
+});
 
 // const upload = multer({
 //   storage: multer.diskStorage({
@@ -263,6 +352,6 @@ app.post('/login', async (req, res) => {
 //
 app.listen(3000,()=>{
     console.log("started")
-    console.log("connected to DB")
+    // console.log("connected to DB")
 })
 
