@@ -135,7 +135,8 @@ const upload = multer({ limits: { fileSize: 50 * 1024 * 1024 } }); // Set the ma
 
 
 const AudioFiles = require('./Models/audioFiles')
-const Teacher = require('./Models/teachers')
+const Teacher = require('./Models/teachers');
+const audioFiles = require('./Models/audioFiles');
 
 app.post('/audio', upload.single('audio'), async (req, res) => {
   const { audio, time, email, name, teacherData } = req.body;
@@ -167,6 +168,7 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
       obj.teacherEmail = teacherData.email;
       obj.time = time;
       obj.ownerEmail = email;
+      obj.key = params.Key;
       obj.status = null
       console.log('Audio file uploaded successfully:', data.Location);
 
@@ -199,13 +201,14 @@ app.post('/delete-audio', async (req, res) => {
 
   try {
     // Delete the object from the S3 bucket
-    console.log('data', params)
+    // console.log('data', params)
     await s3.deleteObject(params).promise();
     console.log(`Recording ${filename} deleted successfully from S3`);
 
     // You can also delete the corresponding entry from your database if needed
+    let data = await audioFiles.deleteOne({ key: params.Key});
 
-    res.status(200).json({ message: `Recording ${filename} deleted successfully` });
+    res.status(200).json({ message: `Recording ${filename} deleted successfully`, data });
   } catch (error) {
     console.error(`Error deleting recording ${filename} from S3:`, error);
     res.status(500).json({ error: 'Failed to delete recording from S3' });

@@ -16,6 +16,9 @@ const AudioFiles = new mongoose.Schema({
     status:{
         type: String,
     },
+    key:{
+        type: String,
+    },
     time:
     {
         type:String, 
