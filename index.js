@@ -26,8 +26,8 @@ const app = express();
 //app.use(express.json());
 app.use(express.urlencoded());
 app.use(cors());
-app.use(express.json({limit: '25mb'}));
-app.use(express.urlencoded({limit: '25mb', extended: true}));
+app.use(express.json({limit: '100mb'}));
+app.use(express.urlencoded({limit: '100mb', extended: true}));
 // const upload = multer({ dest: 'uploads/' });
 
 
@@ -131,7 +131,7 @@ app.get('/audio', async (req, res) => {
   }
 });
 
-const upload = multer({ limits: { fileSize: 50 * 1024 * 1024 } }); // Set the maximum file size limit to 10MB
+const upload = multer({ limits: { fileSize: 100 * 1024 * 1024 } }); // Set the maximum file size limit to 100MB
 
 
 const AudioFiles = require('./Models/audioFiles')
@@ -140,8 +140,9 @@ const audioFiles = require('./Models/audioFiles');
 
 app.post('/audio', upload.single('audio'), async (req, res) => {
   const { audio, time, email, name, teacherData } = req.body;
+  // console.log(audio, time, email, name, teacherData, 'Dataaaaaaaaaaaaaaa')
   let obj = {};
-  let link;
+  // let link;
 
   const base64Data = audio.replace(/^data:audio\/(.*);base64,/, '');
   let fileName = `audio_${time}.m4a`; // Generate a unique file name
@@ -158,7 +159,7 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
     Body: Buffer.from(base64Data, 'base64'),
     ContentType: 'audio/m4a',
   };
-
+  console.log('ffffffffffffffffffffffffffffffffffff')
   s3.upload(params, async (err, data) => {
     if (err) {
       console.error('Error uploading audio file:', err);
@@ -184,6 +185,7 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
         console.error('Error adding audio file:', error);
         res.status(500).send('Internal Server Error');
       }
+      console.log('eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
     }
   });
 });
