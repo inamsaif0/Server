@@ -172,9 +172,9 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
     ContentType: 'audio/mp3',
   };
 
-  const regex = /\/([^/]+\.mp3)$/; // Match the last slash, followed by one or more characters not including '/', ending with '.mp4'
-const match = params.Key.match(regex);
-  console.log('ffffffffffffffffffffffffffffffffffff', match)
+//   const regex = /\/([^/]+\.mp3)$/; // Match the last slash, followed by one or more characters not including '/', ending with '.mp4'
+// const match = params.Key.match(regex);
+//   console.log('ffffffffffffffffffffffffffffffffffff', match)
   s3.upload(params, async (err, data) => {
     if (err) {
       console.error('Error uploading audio file:', err);
@@ -185,7 +185,7 @@ const match = params.Key.match(regex);
       obj.time = time;
       obj.ownerEmail = email;
       obj.key = params.Key;
-      obj.name = match
+      obj.name = name
       obj.status = null
       console.log('Audio file uploaded successfully:', data.Location);
 

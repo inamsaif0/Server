@@ -5,6 +5,9 @@ const AudioFiles = new mongoose.Schema({
     {
         type:String, 
     },
+    name:{
+        type: String,
+    },
     ownerEmail:
     {
         type:String, 
