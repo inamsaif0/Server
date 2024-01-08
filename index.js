@@ -109,7 +109,7 @@ app.post('/all-audio', async (req, res) => {
   const { email } = req.body;
 
   try {
-    let data = await audioFiles.find({ ownerEmail: email });
+    let data = await audioFiles.find({ ownerEmail: email }).sort({ time: -1 });
     res.status(200).json(data);
   } catch (err) {
     console.error('Error fetching audio files:', err);
