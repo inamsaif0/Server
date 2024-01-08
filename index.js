@@ -105,6 +105,18 @@ app.get('/getTeachers', async(req, res) => {
   res.status(200).json({data})
 })
 
+app.post('/all-audio', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    let data = await audioFiles.find({ ownerEmail: email });
+    res.status(200).json(data);
+  } catch (err) {
+    console.error('Error fetching audio files:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 app.get('/audio', async (req, res) => {
   const { email } = req.query;
   const bucketName = 'otp-mobile';
@@ -118,7 +130,7 @@ app.get('/audio', async (req, res) => {
     };
 
     const data = await s3.listObjectsV2(params).promise();
-    const audioFiles = data.Contents.filter(file => file.Key.endsWith('.m4a'));
+    const audioFiles = data.Contents.filter(file => file.Key.endsWith('.wav'));
     
     // Sort the audio files by LastModified date
     audioFiles.sort((a, b) => b.LastModified - a.LastModified);
@@ -157,9 +169,12 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
     Bucket: bucketName,
     Key: 'otp-audio/' + email + '/' + fileName,
     Body: Buffer.from(base64Data, 'base64'),
-    ContentType: 'audio/m4a',
+    ContentType: 'audio/mp3',
   };
-  console.log('ffffffffffffffffffffffffffffffffffff')
+
+  const regex = /\/([^/]+\.mp3)$/; // Match the last slash, followed by one or more characters not including '/', ending with '.mp4'
+const match = params.Key.match(regex);
+  console.log('ffffffffffffffffffffffffffffffffffff', match)
   s3.upload(params, async (err, data) => {
     if (err) {
       console.error('Error uploading audio file:', err);
@@ -170,6 +185,7 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
       obj.time = time;
       obj.ownerEmail = email;
       obj.key = params.Key;
+      obj.name = match
       obj.status = null
       console.log('Audio file uploaded successfully:', data.Location);
 
@@ -190,7 +206,7 @@ app.post('/audio', upload.single('audio'), async (req, res) => {
   });
 });
 app.post('/delete-audio', async (req, res) => {
-  const { filename, email } = req.body; // Assuming the filename is provided in the request body
+  const { filename, email, id } = req.body; // Assuming the filename is provided in the request body
   const bucketName = 'otp-mobile'; // Replace with your S3 bucket name
   // const key = 'otp-audio/' + filename;
   const params = {
@@ -208,7 +224,8 @@ app.post('/delete-audio', async (req, res) => {
     console.log(`Recording ${filename} deleted successfully from S3`);
 
     // You can also delete the corresponding entry from your database if needed
-    let data = await audioFiles.deleteOne({ key: params.Key});
+    console.log(params.Key)
+    let data = await audioFiles.deleteOne({ _id: id});
 
     res.status(200).json({ message: `Recording ${filename} deleted successfully`, data });
   } catch (error) {
